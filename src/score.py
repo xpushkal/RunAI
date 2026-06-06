@@ -18,21 +18,33 @@ and non-increasing by rank (satisfies the validator).
 from __future__ import annotations
 
 
-def relevance_from_features(feat: dict) -> float:
-    """Structured relevance proxy (M2). Blended with embedding sim in M3."""
+def structured_proxy(feat: dict, cfg: dict) -> float:
+    """Structured relevance proxy (the M2 signal): title + career + skill trust."""
+    w = cfg["scoring"]["structured_proxy"]
     return (
-        0.45 * feat["title_fit"]
-        + 0.40 * feat["career_fit"]
-        + 0.15 * feat["skill_trust"]
+        w["title"] * feat["title_fit"]
+        + w["career"] * feat["career_fit"]
+        + w["skill"] * feat["skill_trust"]
     )
 
 
-def final_score(feat: dict, cfg: dict, graph_boost: float = 1.0) -> float:
-    relevance = feat.get("relevance")
-    if relevance is None:
-        relevance = relevance_from_features(feat)
+def relevance(feat: dict, cfg: dict) -> float:
+    """Blend semantic embedding similarity with the structured proxy.
 
-    base = relevance * feat["experience_fit"] * feat["location_fit"] * graph_boost
+    `embed_sim` (rescaled cosine to the JD query, in [0,1]) is attached by rank.py
+    when cached embeddings are available; if absent we fall back to structured-only.
+    """
+    proxy = structured_proxy(feat, cfg)
+    embed_sim = feat.get("embed_sim")
+    if embed_sim is None:
+        return proxy
+    blend = cfg["scoring"]["relevance_blend"]
+    return blend["embed"] * embed_sim + blend["structured"] * proxy
+
+
+def final_score(feat: dict, cfg: dict, graph_boost: float = 1.0) -> float:
+    rel = relevance(feat, cfg)
+    base = rel * feat["experience_fit"] * feat["location_fit"] * graph_boost
     score = base * feat["penalty"] * feat["behavior_mod"]
 
     if cfg["honeypot"]["hard_demote"] and feat["honeypot_score"] >= cfg["honeypot"]["score_threshold"]:

@@ -18,7 +18,7 @@ embedding:
   model_name: "BAAI/bge-small-en-v1.5"   # CPU-friendly; fallback: sentence-transformers/all-MiniLM-L6-v2
   batch_size: 256
   normalize: true
-  max_seq_length: 384
+  max_seq_length: 256
 
 graph:
   knn_neighbors: 15          # FAISS kNN edges per candidate for the similarity graph
@@ -31,6 +31,16 @@ graph:
 # ----------------------------------------------------------------------------
 scoring:
   w_relevance: 1.0
+  # relevance = embed*embed_sim + structured*structured_proxy (blend; must sum to ~1)
+  relevance_blend:
+    embed: 0.55         # semantic similarity to the JD query
+    structured: 0.45    # title/career/skill proxy (the M2 signal)
+  structured_proxy:     # weights inside the structured relevance proxy
+    title: 0.50
+    career: 0.40
+    skill: 0.10
+  embed_sim_floor: 0.30 # cosine below this contributes ~0 (rescale floor)
+  embed_sim_ceil: 0.75  # cosine at/above this is full credit
   role_gate:
     floor: 0.15            # minimum multiplier for clearly off-role candidates
   skill_trust:
