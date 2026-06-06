@@ -51,12 +51,13 @@ def peer_quality(embeddings: np.ndarray, role_quality: np.ndarray, k: int,
     n, d = embeddings.shape
     index = faiss.IndexFlatIP(d)
     index.add(embeddings)
-    sims, idx = index.search(embeddings, k + 1)  # +1 because the top hit is self
+    k_eff = min(k + 1, n)  # +1 for self; clamp for small samples (demo)
+    sims, idx = index.search(embeddings, k_eff)
 
     out = np.empty(n, dtype=np.float32)
     for i in range(n):
         neigh_sims, neigh_idx = sims[i], idx[i]
-        mask = (neigh_idx != i) & (neigh_sims >= min_sim)
+        mask = (neigh_idx != i) & (neigh_idx >= 0) & (neigh_sims >= min_sim)
         if not mask.any():
             out[i] = role_quality[i]  # isolated node: fall back to its own quality
             continue
@@ -128,34 +129,16 @@ def company_product_scores(companies: list[str], industries: list[str]) -> np.nd
 
 
 # ---------------------------------------------------------------------------
-# offline driver
+# core computation (shared by offline precompute and the in-memory demo)
 # ---------------------------------------------------------------------------
-def precompute_graph(cfg: dict) -> None:
-    paths = cfg["paths"]
-    ids = np.load(paths["candidate_ids"])
-    embeddings = np.load(paths["embeddings"])
+def compute_boosts(embeddings, role_quality, skill_lists, companies, industries, cfg):
+    """Return (peer, coherence, product, graph_boost) arrays for a set of candidates.
 
-    role_quality = np.empty(len(ids), dtype=np.float32)
-    skill_lists: list[list[str]] = []
-    companies: list[str] = []
-    industries: list[str] = []
-
-    for i, c in enumerate(stream_candidates(paths["candidates"])):
-        if i >= len(ids):
-            break
-        assert c["candidate_id"] == ids[i], "candidate order must match cached embeddings"
-        role_quality[i] = title_fit(c)
-        skill_lists.append([_lower(s.get("name", "")) for s in c.get("skills", [])])
-        p = c.get("profile", {})
-        companies.append(_lower(p.get("current_company", "")))
-        industries.append(_lower(p.get("current_industry", "")))
-
+    Works on the full pool (offline) or a small sample (the Streamlit demo).
+    """
     gcfg = cfg["graph"]
-    print("Computing peer_quality (FAISS kNN) ...")
     peer = peer_quality(embeddings, role_quality, gcfg["knn_neighbors"], gcfg["knn_min_similarity"])
-    print("Computing skill_coherence (networkx co-occurrence) ...")
     coher = skill_coherence(skill_lists)
-    print("Computing company_product (networkx bipartite) ...")
     prod = company_product_scores(companies, industries)
 
     w = gcfg["boost_weights"]
@@ -163,13 +146,44 @@ def precompute_graph(cfg: dict) -> None:
     bmin = cfg["scoring"]["graph_boost"]["min"]
     bmax = cfg["scoring"]["graph_boost"]["max"]
     boost = bmin + (bmax - bmin) * raw
+    return peer, coher, prod, boost.astype(np.float32)
+
+
+def _collect_inputs(records):
+    """Extract role_quality / skill_lists / companies / industries from candidate dicts."""
+    role_quality = np.array([title_fit(c) for c in records], dtype=np.float32)
+    skill_lists = [[_lower(s.get("name", "")) for s in c.get("skills", [])] for c in records]
+    companies = [_lower(c.get("profile", {}).get("current_company", "")) for c in records]
+    industries = [_lower(c.get("profile", {}).get("current_industry", "")) for c in records]
+    return role_quality, skill_lists, companies, industries
+
+
+# ---------------------------------------------------------------------------
+# offline driver
+# ---------------------------------------------------------------------------
+def precompute_graph(cfg: dict) -> None:
+    paths = cfg["paths"]
+    ids = np.load(paths["candidate_ids"])
+    embeddings = np.load(paths["embeddings"])
+
+    records = []
+    for i, c in enumerate(stream_candidates(paths["candidates"])):
+        if i >= len(ids):
+            break
+        assert c["candidate_id"] == ids[i], "candidate order must match cached embeddings"
+        records.append(c)
+
+    role_quality, skill_lists, companies, industries = _collect_inputs(records)
+    print("Computing graph features (FAISS kNN + networkx) ...")
+    peer, coher, prod, boost = compute_boosts(
+        embeddings, role_quality, skill_lists, companies, industries, cfg)
 
     df = pd.DataFrame({
         "candidate_id": ids,
         "peer_quality": peer,
         "skill_coherence": coher,
         "company_product": prod,
-        "graph_boost": boost.astype(np.float32),
+        "graph_boost": boost,
     })
     Path(paths["artifacts_dir"]).mkdir(parents=True, exist_ok=True)
     df.to_parquet(paths["graph_features"], index=False)
