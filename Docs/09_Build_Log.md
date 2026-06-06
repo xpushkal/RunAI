@@ -75,3 +75,34 @@ Per-milestone record of what was built, results, and decisions. One section per 
   CV skills AND 0 core-AI skills) is too narrow. **M4** strengthens CV/speech detection (title +
   career + skill mix) and adds the remaining negative signals (research-only, LangChain-only,
   no-code-18mo, title-chaser) and a richer honeypot detector (target ~80, currently ~45).
+
+---
+
+## M4 — Honeypot detector + JD disqualifier rules
+
+**Branch:** `M4` (off `M3`). **Status:** ✅ traps demoted, genuine fits preserved.
+
+### Calibration (full-pool scan)
+- Tested candidate honeypot checks. **Rejected as noise**: `skill_gt_career` (9,231 hits) and
+  `active_before_signup` (7,496) — far too common to be "impossible," they're dataset quirks.
+- **Kept (precision-first, logically impossible):** `dur_vs_dates` (duration_months disagrees with
+  start/end by >6mo, 33), `career_gt_yoe` (24), `expert_0mo` (21), plus `currole_gt_career`,
+  `expert_lowassess`, `start_gt_end`. **Clean union = 59 honeypots**, **0 in the top 100**.
+- The spec's ~80 includes "tenure at a company founded later" cases needing founding-year data we
+  don't have; the spec says natural avoidance is fine and the DQ gate is >10% in top 100 → clear at 0%.
+
+### What was built (`src/features.py`)
+- `honeypot_signal()` rewritten: dropped the noisy checks, added the date-vs-duration check;
+  hard-demotes (`score → 0`) any candidate with a flag.
+- `negative_penalty()` expanded with: **cv_speech_only** (CV/speech-primary AND no core IR/NLP
+  skill AND no NLP/IR career evidence), **research_only**, **langchain_only**, **title_chaser**
+  (≥4 roles, avg tenure <18mo). All multiplicative, all precision-first.
+
+### Results
+- Ranking step 8.7s; validator **valid**; top-100 still **0 honeypots, 0 stuffers**, YOE 4.9–9.0.
+- Pool-wide flags: honeypot 59, consulting_only 13,049, langchain_only 2,801, cv_speech_only 1,331
+  (down from 1,948 — now spares CV-titled people who have NLP/IR), title_chaser 623.
+- **Key validation:** the 4 "Computer Vision Engineer" profiles remaining in the top 100 are
+  genuine retrieval/ranking engineers with CV titles (RAG/NLP/pgvector/Learning-to-Rank skills,
+  "built recommendation/ranking systems" in career text). The penalty **correctly** does not fire
+  on them — the system reads beyond the title, exactly the JD's intent.

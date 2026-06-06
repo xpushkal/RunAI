@@ -40,6 +40,13 @@ def _saturate(x: float, cap: float) -> float:
     return min(1.0, x / cap) if cap > 0 else 0.0
 
 
+def _months_between(a, b) -> int | None:
+    d1, d2 = _parse_date(a), _parse_date(b)
+    if not d1 or not d2:
+        return None
+    return (d2.year - d1.year) * 12 + (d2.month - d1.month)
+
+
 def _any_term(text: str, terms) -> bool:
     return any(t in text for t in terms)
 
@@ -183,13 +190,47 @@ def negative_penalty(c: dict, cfg: dict) -> tuple[float, list[str]]:
         flags.append("consulting_only")
         mult *= pen["consulting_only"]
 
-    # CV/speech/robotics-primary without NLP/IR: skills dominated by vision/speech, no core AI.
+    # CV/speech/robotics-primary WITHOUT NLP/IR exposure (JD do-not-want).
+    # Fire when vision/speech dominates the title or skills AND there is no core
+    # IR/NLP skill and no NLP/IR evidence in the career free-text.
+    title = _lower(c.get("profile", {}).get("current_title", ""))
     skill_names = [_lower(s.get("name", "")) for s in c.get("skills", [])]
-    cv_hits = sum(1 for s in skill_names if _any_term(s, jd.CV_SPEECH_ROBOTICS_TERMS))
+    cv_skill_hits = sum(1 for s in skill_names if s in {t for t in jd.CV_SPEECH_ROBOTICS_TERMS})
+    cv_title = _any_term(title, jd.CV_SPEECH_ROBOTICS_TERMS)
     core_hits = sum(1 for s in skill_names if s in jd.CORE_AI_SKILLS)
-    if cv_hits >= 3 and core_hits == 0:
+    blob = _lower(c.get("profile", {}).get("summary", ""))
+    for j in c.get("career_history", []):
+        blob += " " + _lower(j.get("description", ""))
+    nlp_ir_evidence = any(t in blob for t in (
+        "nlp", "natural language", "retrieval", "search", "ranking", "recommend",
+        "embedding", "semantic", "information retrieval",
+    ))
+    if (cv_title or cv_skill_hits >= 2) and core_hits == 0 and not nlp_ir_evidence:
         flags.append("cv_speech_only")
         mult *= pen["cv_speech_only"]
+
+    # Research-only career with no production deployment (JD disqualifier).
+    titles = [title] + [_lower(j.get("title", "")) for j in c.get("career_history", [])]
+    if titles and all(
+        (not t) or _any_term(t, jd.RESEARCH_ONLY_TERMS) for t in titles
+    ) and any(_any_term(t, jd.RESEARCH_ONLY_TERMS) for t in titles):
+        if not any(w in blob for w in ("production", "deployed", "shipped", "users", "scale")):
+            flags.append("research_only")
+            mult *= pen["research_only"]
+
+    # LangChain-wrapper-only: LangChain present but no deeper IR/ranking signal.
+    if _any_term(blob + " " + " ".join(skill_names), jd.LANGCHAIN_TERMS) \
+            and core_hits <= 1 and not nlp_ir_evidence:
+        flags.append("langchain_only")
+        mult *= pen["langchain_only"]
+
+    # Title-chaser: many short stints (avg role tenure < 18 months over >= 4 roles).
+    ch = c.get("career_history", [])
+    if len(ch) >= 4:
+        durs = [j.get("duration_months", 0) for j in ch]
+        if durs and sum(durs) / len(durs) < 18:
+            flags.append("title_chaser")
+            mult *= pen["title_chaser"]
 
     return mult, flags
 
@@ -206,6 +247,16 @@ def honeypot_signal(c: dict, cfg: dict) -> tuple[float, list[str]]:
     ch = c.get("career_history", [])
     total_career = sum(j.get("duration_months", 0) for j in ch)
     flags = []
+
+    # Stated duration_months disagrees with the role's start/end dates (impossible).
+    # Note: the noisy checks `skill_gt_career` (9.2k hits) and `active_before_signup`
+    # (7.5k) were rejected in M4 calibration as data noise, not honeypot signal.
+    for j in ch:
+        dm = j.get("duration_months")
+        comp = _months_between(j.get("start_date"), j.get("end_date") or "2026-06-06")
+        if dm is not None and comp is not None and abs(dm - comp) > 6:
+            flags.append("dur_vs_dates")
+            break
 
     for s in skills:
         if s.get("proficiency") in ("expert", "advanced") and s.get("duration_months", 0) == 0:
