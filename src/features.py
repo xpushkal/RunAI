@@ -300,6 +300,17 @@ def extract(c: dict, cfg: dict) -> dict:
     hp_score, hp_flags = honeypot_signal(c, cfg)
     sig = c.get("redrob_signals", {})
 
+    # JD must-have evidence the candidate actually has (for reasoning — never invented).
+    skill_names = [s.get("name", "") for s in c.get("skills", [])]
+    skill_lower = {_lower(n): n for n in skill_names}
+    vector_db_skills = [skill_lower[k] for k in skill_lower if k in jd.VECTOR_DB_SKILLS]
+    eval_skills = [skill_lower[k] for k in skill_lower if k in jd.EVAL_SKILLS]
+    blob = _lower(p.get("summary", ""))
+    for j in c.get("career_history", []):
+        blob += " " + _lower(j.get("description", ""))
+    career_evidence = [t for t in jd.CAREER_EVIDENCE_TERMS if t in blob][:3]
+    gh = sig.get("github_activity_score")
+
     return {
         "candidate_id": c["candidate_id"],
         "title_fit": tf,
@@ -312,18 +323,24 @@ def extract(c: dict, cfg: dict) -> dict:
         "negative_flags": neg_flags,
         "honeypot_score": hp_score,
         "honeypot_flags": hp_flags,
-        # raw facts for reasoning / inspection
+        # raw facts for reasoning / inspection (all drawn directly from the profile)
         "facts": {
             "current_title": p.get("current_title", ""),
             "current_company": p.get("current_company", ""),
             "current_industry": p.get("current_industry", ""),
+            "is_product": _lower(p.get("current_industry", "")) in jd.PRODUCT_INDUSTRIES,
+            "location": p.get("location", ""),
             "country": p.get("country", ""),
             "years_of_experience": p.get("years_of_experience", 0),
             "top_skills": top_skills,
+            "vector_db_skills": vector_db_skills,
+            "eval_skills": eval_skills,
+            "career_evidence": career_evidence,
             "recruiter_response_rate": sig.get("recruiter_response_rate"),
             "last_active_date": sig.get("last_active_date"),
             "open_to_work": sig.get("open_to_work_flag"),
             "notice_period_days": sig.get("notice_period_days"),
             "willing_to_relocate": sig.get("willing_to_relocate"),
+            "github_activity_score": gh if (gh is not None and gh >= 0) else None,
         },
     }

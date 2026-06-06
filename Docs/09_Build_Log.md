@@ -135,3 +135,29 @@ all precomputed offline into `artifacts/graph_features.parquet` (ranking just lo
   corpus) — by design it's a secondary signal; peer_quality + company_product do the separating.
 - Net effect: a ±15% reinforcement/tie-break nudge that strengthens genuine fits without letting
   semantic relevance get overridden.
+
+---
+
+## M6 — Reasoning generator + audit
+
+**Branch:** `M6` (off `M5`). **Status:** ✅ passes all six Stage-4 reasoning checks.
+
+### What was built
+- `src/features.py` `extract()` enriched the per-candidate `facts` with JD-must-have evidence the
+  candidate *actually* has: `vector_db_skills`, `eval_skills`, `career_evidence` (matched phrases),
+  `is_product`, `github_activity_score` (sentinel-masked), location.
+- `src/reasoning.py` rewritten: composes a lead (title+company+YOE) + a JD-connected fit clause
+  (career evidence / vector-DB / eval / corroborated skills / product background) + a closing
+  sentence that is either an **honest concern** or a behavioural positive. Variation from a
+  **stable `zlib.crc32`** skeleton choice (3 structures) × per-candidate evidence selection.
+  Display normalisation (`rag→RAG`, `fine-tun→fine-tuning`, …).
+
+### Audit (full top 100)
+- **0 hallucinated skills** — every named skill verified present in the real profile (facts are
+  built directly from the candidate's skills, never invented).
+- **100/100 unique** reasoning strings (variation check).
+- **Determinism:** two runs produce byte-identical CSV (crc32, not `hash()`; stable sorts).
+- Length 175–324 chars (~1–2 sentences); tone tracks rank (top: strengths + "active and
+  responsive"; low: "more adjacent than exact match" + explicit concern e.g. notice period,
+  not-open-to-work, below/above the 5-9 band).
+- Validator: **valid**; ranking step 11.7s.
