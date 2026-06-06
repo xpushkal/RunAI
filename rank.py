@@ -12,7 +12,9 @@ from __future__ import annotations
 import argparse
 import csv
 import time
+from pathlib import Path
 
+from src import embeddings as emb
 from src import features as feat_mod
 from src import reasoning as reasoning_mod
 from src import score as score_mod
@@ -22,9 +24,41 @@ from src.ingest import stream_candidates
 HEADER = ["candidate_id", "rank", "score", "reasoning"]
 
 
+def _embed_sims(cfg: dict) -> dict | None:
+    """Load cached embeddings and return {candidate_id: rescaled_sim} or None.
+
+    Pure numpy — no torch, no network. If artifacts are missing we return None
+    and the ranker falls back to the structured-only relevance (M2 behavior).
+    """
+    if not emb.artifacts_exist(cfg):
+        return None
+    import numpy as np
+
+    paths = cfg["paths"]
+    vecs = np.load(paths["embeddings"])
+    ids = np.load(paths["candidate_ids"])
+    jd_vec = np.load(Path(paths["artifacts_dir"], "jd_embedding.npy"))
+    sim = emb.cosine_to_query(vecs, jd_vec)
+    sim = emb.rescale_similarity(
+        sim, cfg["scoring"]["embed_sim_floor"], cfg["scoring"]["embed_sim_ceil"]
+    )
+    return {cid: float(s) for cid, s in zip(ids, sim)}
+
+
 def build(candidates_path: str, cfg: dict) -> list[dict]:
-    """Extract features for every candidate, then rank to top-N."""
-    features = [feat_mod.extract(c, cfg) for c in stream_candidates(candidates_path)]
+    """Extract features for every candidate, attach embedding sim, then rank to top-N."""
+    sims = _embed_sims(cfg)
+    if sims is None:
+        print("WARNING: no cached embeddings found — using structured-only relevance "
+              "(run `python -m src.precompute` for semantic ranking).")
+
+    features = []
+    for c in stream_candidates(candidates_path):
+        feat = feat_mod.extract(c, cfg)
+        if sims is not None:
+            feat["embed_sim"] = sims.get(feat["candidate_id"])
+        features.append(feat)
+
     top = score_mod.rank_candidates(features, cfg)
     for f in top:
         f["reasoning"] = reasoning_mod.generate(f)

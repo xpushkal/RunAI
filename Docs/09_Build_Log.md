@@ -42,3 +42,36 @@ Per-milestone record of what was built, results, and decisions. One section per 
 - Honeypot detection still precision-first (catches ~45/80). **M4** expands it and the negative
   signals (research-only, LangChain-only, no-code-18mo, title-chaser).
 - Reasoning is solid but somewhat templated; **M6** adds variation + sharper honest concerns.
+
+---
+
+## M3 — Embeddings + semantic relevance (precompute / light-rank split)
+
+**Branch:** `M3` (off `M2`). **Status:** ✅ blended ranking, within budget.
+
+### What was built
+- `src/embeddings.py` — load model (offline only), encode, cosine-to-query, rescale, artifact check.
+- `src/precompute.py` — offline embedder: streams pool → `candidate_document()` → embeds with
+  **BAAI/bge-small-en-v1.5** (CPU) → saves `artifacts/embeddings.npy` (100000×384 float32, L2-norm),
+  `candidate_ids.npy`, `jd_embedding.npy`. The JD query vector is cached so the ranking step needs
+  **no torch and no model load** — only numpy.
+- `src/score.py` — `relevance = 0.55·embed_sim + 0.45·structured_proxy` (blend configurable);
+  rescales cosine via `[embed_sim_floor=0.30, embed_sim_ceil=0.75] → [0,1]`. Falls back to
+  structured-only if artifacts are absent.
+- `rank.py` — loads cached vectors (pure numpy), attaches `embed_sim` per candidate, then ranks.
+- Config: `embedding.max_seq_length` trimmed 384→256 for precompute speed; `scoring.relevance_blend`,
+  `structured_proxy`, `embed_sim_floor/ceil` added.
+
+### Results (full 100k pool)
+- Precompute: ~14 min offline (one-time, allowed to exceed budget). 100000×384 vectors cached.
+- **Ranking step: 6.3s** (loads ~150 MB of vectors + numpy dot product); validator: **valid**.
+- Top-100 audit: still **0 honeypots, 0 off-role/stuffers**; YOE 4.9–9.0 (mean 6.3); 100% India.
+- Embeddings added recall: surfaced **Senior Applied Scientists** (Swiggy, Sarvam AI, Niramai)
+  that structured-only ranked lower — the "plain-language fit" behavior we wanted.
+
+### Carry-forward to M4
+- **CV-primary leakage:** 5 "Computer Vision Engineer" profiles entered ranks 42–95. The JD names
+  CV/speech/robotics-without-NLP as a do-not-want. The current `cv_speech_only` penalty (needs ≥3
+  CV skills AND 0 core-AI skills) is too narrow. **M4** strengthens CV/speech detection (title +
+  career + skill mix) and adds the remaining negative signals (research-only, LangChain-only,
+  no-code-18mo, title-chaser) and a richer honeypot detector (target ~80, currently ~45).
