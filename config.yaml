@@ -1,0 +1,76 @@
+# ============================================================================
+# Redrob Candidate Ranking — configuration
+# All tunable knobs live here so scoring can be adjusted without code edits.
+# ============================================================================
+
+paths:
+  candidates: "India_runs_data_and_ai_challenge/candidates.jsonl"
+  artifacts_dir: "artifacts"
+  embeddings: "artifacts/embeddings.npy"
+  candidate_ids: "artifacts/candidate_ids.npy"
+  features: "artifacts/features.parquet"
+  honeypot: "artifacts/honeypot.parquet"
+  graph: "artifacts/graph.pkl"
+  graph_features: "artifacts/graph_features.parquet"
+  output: "submission.csv"
+
+embedding:
+  model_name: "BAAI/bge-small-en-v1.5"   # CPU-friendly; fallback: sentence-transformers/all-MiniLM-L6-v2
+  batch_size: 256
+  normalize: true
+  max_seq_length: 384
+
+graph:
+  knn_neighbors: 15          # FAISS kNN edges per candidate for the similarity graph
+  knn_min_similarity: 0.55   # prune weak similarity edges
+
+# ----------------------------------------------------------------------------
+# Scoring weights. final = base * penalties * behavior_mod * (0 if honeypot)
+# base = relevance^w_rel * role_gate * skill_trust * experience_fit * location_fit * graph_boost
+# Multiplicative gates are in [0,1]; relevance is exponentiated by w_rel.
+# ----------------------------------------------------------------------------
+scoring:
+  w_relevance: 1.0
+  role_gate:
+    floor: 0.15            # minimum multiplier for clearly off-role candidates
+  skill_trust:
+    floor: 0.3
+    endorsement_saturation: 25   # endorsements past this add little
+    duration_saturation_months: 36
+  experience:
+    ideal_min: 5.0
+    ideal_max: 9.0
+    soft_falloff_years: 4.0      # how fast fit decays outside the band
+  location:
+    in_country_bonus: 1.0        # India
+    relocatable_bonus: 0.9
+    out_of_scope: 0.6
+  graph_boost:
+    min: 0.85
+    max: 1.15
+
+behavior_modifier:
+  min: 0.6                # most a dormant/unresponsive candidate is scaled down
+  max: 1.1               # most an active/responsive candidate is scaled up
+  stale_days: 120        # last_active older than this starts to hurt
+  low_response_rate: 0.15
+
+penalties:                # multipliers in [0,1] applied when a negative flag fires
+  consulting_only: 0.5
+  research_only: 0.4
+  langchain_only: 0.6
+  no_code_18mo: 0.7
+  title_chaser: 0.8
+  cv_speech_only: 0.55
+
+honeypot:
+  hard_demote: true      # force flagged honeypots out of the top 100
+  score_threshold: 0.5   # honeypot_score >= threshold -> treated as honeypot
+
+output:
+  top_n: 100
+  score_min: 0.20        # lowest emitted score (rank 100 floor) for readable spread
+  score_max: 0.99        # highest emitted score (rank 1)
+
+run:
+  seed: 42

@@ -18,6 +18,8 @@ analysis of the candidate pool.
 | 05 | [Evaluation_and_Scoring.md](05_Evaluation_and_Scoring.md) | Scoring metrics, tiebreaks, and the 5-stage evaluation pipeline. |
 | 06 | [Traps_and_Honeypots.md](06_Traps_and_Honeypots.md) | The adversarial dataset: keyword stuffers, Tier-5 fits, honeypots, disqualifiers. |
 | 07 | [Architecture.md](07_Architecture.md) | Proposed system architecture and the ranking pipeline (living document). |
+| — | [../plan.md](../plan.md) | Approved implementation plan: phased flow, tech stack, milestones, verification. |
+| 08 | [08_M1_Findings.md](08_M1_Findings.md) | M1 data-exploration findings from the full 100k scan (grounds scoring weights). |
 
 ## Quick facts
 
@@ -34,6 +36,6 @@ analysis of the candidate pool.
 - [x] Read all challenge materials
 - [x] Initial pool exploration (20k-row scan)
 - [x] Documentation drafted
-- [ ] Data exploration deep-dive
-- [ ] Ranking pipeline implementation
-- [ ] Submission packaging
+- [x] Data exploration deep-dive (M1 — see [08_M1_Findings.md](08_M1_Findings.md))
+- [ ] Ranking pipeline implementation (M2–M6)
+- [ ] Demo + submission packaging (M7–M8)
