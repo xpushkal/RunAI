@@ -188,3 +188,22 @@ all precomputed offline into `artifacts/graph_features.parquet` (ranking just lo
 - In-memory pipeline runs on the bundled 50-candidate sample (Recommendation Systems Engineer #1).
 - `app.py` imports cleanly; pyvis graph HTML generated (8.6 KB, nodes present).
 - `streamlit run app.py --server.headless true` serves **HTTP 200**.
+
+---
+
+## M8 — Hardening (compute budget, determinism, final validation)
+
+**Branch:** `M8` (off `M7`). **Status:** ✅ all constraints verified. See [10_Results.md](10_Results.md).
+
+### What was done
+- Measured the ranking step with `/usr/bin/time -l`: **12.6 s wall, 556 MB peak RSS** (limits:
+  5 min / 16 GB) — ~24×/29× headroom.
+- Verified the rank path loads **no torch/faiss/sentence_transformers** (pure numpy/pandas over
+  cached artifacts → no network possible, tiny memory).
+- Determinism: two runs → **byte-identical** CSV.
+- Final format validation: **valid**.
+- Final top-100 audit: **0 honeypots, 0 stuffers**, YOE 4.7–8.9 (mean 6.2), 100% India, all
+  product industries; top 10 are AI/ML/search engineers at Razorpay, Zomato, Google, CRED,
+  Swiggy, Sarvam AI, Paytm, etc.
+- Added `Makefile` (setup / precompute / rank / validate / verify / demo / explore) and
+  `Docs/10_Results.md` (final results + verification).
