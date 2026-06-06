@@ -1,18 +1,23 @@
 # Redrob Hackathon — Submission Metadata
 # (mirrors the portal metadata; see submission_metadata_template.yaml in the bundle)
 
-team_name: "TODO-set-your-registered-team-name"
+team_name: "ZenMasters"  
 
 primary_contact:
   name: "Pushkal Pratap Singh"
-  email: "pushkalx30@gmail.com"
-  phone: "+91-XXXXXXXXXX"          # TODO: fill before submitting
+  email: "pushkalx30@gmail.com"   # Used for all organizer communication
+  phone: "+91-8756234999"        # Used for top-50 / top-10 outreach
 
 team_members:
   - name: "Pushkal Pratap Singh"
     email: "pushkalx30@gmail.com"
-    role: "ML Engineer / Team Lead"
-
+    role: "Team Lead, AI Engineer"          
+  - name: "Rohan Singh Aswal"
+    email: "rohan.aswal.singh.1005@gmail.com"
+    role: "Backend Engineer"         
+  - name: "Meet Patel"
+    email: "justmeetpatel@gmail.com"
+    role: "Backend Engineer"
 # ============================================================================
 # Code and reproducibility
 # ============================================================================
@@ -30,8 +35,8 @@ reproduce_command: "python rank.py --candidates ./India_runs_data_and_ai_challen
 # ============================================================================
 compute:
   platform: "MacBook (Apple Silicon)"
-  cpu_cores: 8
-  ram_gb: 16
+  cpu_cores: 16
+  ram_gb: 24
   python_version: "3.11.13"
   os: "macOS"
   uses_gpu_for_inference: false
