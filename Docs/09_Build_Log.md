@@ -106,3 +106,32 @@ Per-milestone record of what was built, results, and decisions. One section per 
   genuine retrieval/ranking engineers with CV titles (RAG/NLP/pgvector/Learning-to-Rank skills,
   "built recommendation/ranking systems" in career text). The penalty **correctly** does not fire
   on them — the system reads beyond the title, exactly the JD's intent.
+
+---
+
+## M5 — Graph-assisted features (networkx + FAISS kNN)
+
+**Branch:** `M5` (off `M4`). **Status:** ✅ graph reinforces role/quality, traps still excluded.
+
+### What was built (`src/graph.py`)
+The graph does not rank; it derives a bounded `graph_boost ∈ [0.85, 1.15]` from three signals,
+all precomputed offline into `artifacts/graph_features.parquet` (ranking just loads it):
+- **peer_quality** — FAISS `IndexFlatIP` kNN (k=15) over the candidate embeddings; each
+  candidate's score is the similarity-weighted mean `title_fit` of its neighbours. *Are the people
+  most like you on-role?*
+- **skill_coherence** — a `networkx` co-occurrence graph over core-AI skills; measures whether a
+  candidate's AI skills co-occur tightly across the pool.
+- **company_product** — a `networkx` candidate↔company bipartite graph; a company's product-ness
+  is the fraction of its people in product industries, propagated back to the candidate.
+- `graph_boost = min + (max-min)·(0.50·peer + 0.25·coherence + 0.25·product)`.
+- `rank.py` loads the boosts (cheap dict lookup); `src/score.py` already multiplies `base` by it.
+
+### Results
+- Graph precompute ~12s offline; ranking step **12.7s**; validator **valid**; top-100 **0 honeypots**.
+- **Discrimination:** top-100 `graph_boost` 1.066–1.150 (mean 1.125, above the pool's p99 of 1.075);
+  keyword-stuffers (Ops Manager w/ AI skills) get ~0.94 driven by **peer_quality 0.10–0.17**
+  (their neighbours are off-role) and **company_product 0.00** (services employers).
+- `skill_coherence` alone does not catch stuffers (their stuffed AI skills *do* co-occur in the
+  corpus) — by design it's a secondary signal; peer_quality + company_product do the separating.
+- Net effect: a ±15% reinforcement/tie-break nudge that strengthens genuine fits without letting
+  semantic relevance get overridden.

@@ -23,6 +23,11 @@ embedding:
 graph:
   knn_neighbors: 15          # FAISS kNN edges per candidate for the similarity graph
   knn_min_similarity: 0.55   # prune weak similarity edges
+  # graph_boost = min + (max-min) * (w_peer*peer + w_skill*coherence + w_company*product)
+  boost_weights:
+    peer: 0.50               # are your nearest-neighbour candidates on-role?
+    skill_coherence: 0.25    # do your AI skills co-occur as a coherent cluster?
+    company_product: 0.25    # is your employer a product (vs services) company?
 
 # ----------------------------------------------------------------------------
 # Scoring weights. final = base * penalties * behavior_mod * (0 if honeypot)
