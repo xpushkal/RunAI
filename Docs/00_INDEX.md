@@ -22,6 +22,7 @@ analysis of the candidate pool.
 | 08 | [08_M1_Findings.md](08_M1_Findings.md) | M1 data-exploration findings from the full 100k scan (grounds scoring weights). |
 | 09 | [09_Build_Log.md](09_Build_Log.md) | Per-milestone build record (M2–M8): what was built, results, decisions. |
 | 10 | [10_Results.md](10_Results.md) | Final results + compute-constraint verification. |
+| 11 | [11_Ablation.md](11_Ablation.md) | Ablation + robustness analysis (per-layer contribution, weight stability). |
 
 ## Quick facts
 
