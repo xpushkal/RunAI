@@ -16,6 +16,7 @@ from pathlib import Path
 
 from src import embeddings as emb
 from src import features as feat_mod
+from src import graph as graph_mod
 from src import reasoning as reasoning_mod
 from src import score as score_mod
 from src.config import load_config
@@ -52,11 +53,18 @@ def build(candidates_path: str, cfg: dict) -> list[dict]:
         print("WARNING: no cached embeddings found — using structured-only relevance "
               "(run `python -m src.precompute` for semantic ranking).")
 
+    boosts = graph_mod.load_graph_boosts(cfg)
+    if boosts is None:
+        print("WARNING: no graph features found — graph_boost defaults to 1.0 "
+              "(run `python -m src.graph` to enable graph-assisted features).")
+
     features = []
     for c in stream_candidates(candidates_path):
         feat = feat_mod.extract(c, cfg)
         if sims is not None:
             feat["embed_sim"] = sims.get(feat["candidate_id"])
+        if boosts is not None:
+            feat["graph_boost"] = boosts.get(feat["candidate_id"], 1.0)
         features.append(feat)
 
     top = score_mod.rank_candidates(features, cfg)
