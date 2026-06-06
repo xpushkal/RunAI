@@ -1,0 +1,80 @@
+# Redrob Hackathon — Submission Metadata
+# (mirrors the portal metadata; see submission_metadata_template.yaml in the bundle)
+
+team_name: "TODO-set-your-registered-team-name"
+
+primary_contact:
+  name: "Pushkal Pratap Singh"
+  email: "pushkalx30@gmail.com"
+  phone: "+91-XXXXXXXXXX"          # TODO: fill before submitting
+
+team_members:
+  - name: "Pushkal Pratap Singh"
+    email: "pushkalx30@gmail.com"
+    role: "ML Engineer / Team Lead"
+
+# ============================================================================
+# Code and reproducibility
+# ============================================================================
+github_repo: "https://github.com/xpushkal/RunAI"
+
+sandbox_link: "TODO-deploy-streamlit-and-paste-url"   # e.g. HuggingFace Spaces / Streamlit Cloud running app.py
+
+reproduce_command: "python rank.py --candidates ./India_runs_data_and_ai_challenge/candidates.jsonl --out ./submission.csv"
+# Pre-computation (embeddings + graph features) is a documented one-time step:
+#   python -m src.precompute && python -m src.graph
+# The ranking step above then runs in ~12s on CPU with no network.
+
+# ============================================================================
+# Compute environment
+# ============================================================================
+compute:
+  platform: "MacBook (Apple Silicon)"
+  cpu_cores: 8
+  ram_gb: 16
+  python_version: "3.11.13"
+  os: "macOS"
+  uses_gpu_for_inference: false
+  has_network_during_ranking: false
+  pre_computation_required: true
+  pre_computation_time_minutes: 15      # embed 100k docs (bge-small, CPU) + graph features
+
+# ============================================================================
+# AI tools declaration (transparency only — not penalized)
+# ============================================================================
+ai_tools_used:
+  - "Claude"        # architecture, code review, pair-programming via Claude Code
+
+ai_usage_summary: |
+  Used Claude (Claude Code) for architecture discussion, implementation, and code
+  review across the whole build. All design decisions, data exploration, scoring
+  weights, and trap-handling were driven by analysis of the actual candidate pool.
+  No candidate data was sent to any hosted LLM, and the ranking step makes no
+  network/API calls (CPU-only, offline).
+
+# ============================================================================
+# Approach summary (<=200 words)
+# ============================================================================
+methodology_summary: |
+  Two-phase hybrid ranker. OFFLINE precompute: embed all 100k candidate documents
+  (headline + summary + career descriptions) with bge-small (CPU), and build
+  graph-assisted features with networkx + FAISS. ONLINE ranking (<15s, CPU, no
+  network): for each candidate, relevance = 0.55*semantic-similarity-to-JD +
+  0.45*structured-proxy (title + career-evidence + corroborated-skill-trust).
+  This is multiplied by experience-fit, location-fit, and a bounded graph_boost
+  (kNN peer-quality + skill co-occurrence coherence + company product-ness), then
+  by behavioural availability (recency, recruiter response, open-to-work, notice)
+  and JD disqualifier penalties (consulting-only, CV/speech-without-NLP,
+  LangChain-only, title-chaser). Logically-impossible profiles (honeypots) are
+  hard-demoted. The design deliberately reads BEYOND keywords: keyword-stuffers
+  (off-role titles with stuffed AI skills) and honeypots are pushed out, while
+  plain-language fits (built ranking/recsys at product companies) surface via
+  semantic similarity and career evidence. Reasoning is deterministic and
+  fact-grounded (no runtime LLM).
+
+declarations:
+  read_submission_spec: true
+  code_is_original_work: true
+  no_collusion: true
+  honeypot_check_done: true
+  reproduction_tested: true

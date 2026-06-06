@@ -161,3 +161,30 @@ all precomputed offline into `artifacts/graph_features.parquet` (ranking just lo
   responsive"; low: "more adjacent than exact match" + explicit concern e.g. notice period,
   not-open-to-work, below/above the 5-9 band).
 - Validator: **valid**; ranking step 11.7s.
+
+---
+
+## M7 — Streamlit demo + packaging
+
+**Branch:** `M7` (off `M6`). **Status:** ✅ demo boots, Docker + docs + metadata done.
+
+### What was built
+- `src/graph.py` refactored: extracted `compute_boosts()` + `_collect_inputs()` so graph features
+  can be computed in-memory on a small sample (reused by the demo); `peer_quality` made robust to
+  small `n` (clamps `k`, drops FAISS `-1` neighbours).
+- `src/pipeline.py` — `rank_records()`: full in-memory pipeline for a sample (embeds at runtime
+  since ≤100 candidates is cheap; computes graph features on the sample; structured-only fallback).
+- `app.py` — Streamlit sandbox: upload ≤100 candidates (or use the bundled sample) → ranked
+  shortlist table with reasoning + downloadable CSV + an interactive **pyvis** candidate↔JD-skill
+  graph (purple candidate nodes hover-showing reasoning, green JD-relevant skill nodes).
+- `Dockerfile` — Python 3.11-slim, installs requirements, **bakes the bge-small model into the
+  image** (offline ranking), default CMD runs the Streamlit sandbox; documented `docker run`
+  reproduce command.
+- `README.md` — architecture, scoring breakdown, quickstart, demo/Docker, repo layout, constraints.
+- `submission_metadata.yaml` — filled (repo, compute env, AI-tools declaration, ≤200-word
+  methodology, declarations); a few `TODO` fields (team name, phone, sandbox URL) left for the user.
+
+### Verification
+- In-memory pipeline runs on the bundled 50-candidate sample (Recommendation Systems Engineer #1).
+- `app.py` imports cleanly; pyvis graph HTML generated (8.6 KB, nodes present).
+- `streamlit run app.py --server.headless true` serves **HTTP 200**.
