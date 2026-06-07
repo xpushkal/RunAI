@@ -23,7 +23,7 @@ team_members:
 # ============================================================================
 github_repo: "https://github.com/xpushkal/RunAI"
 
-sandbox_link: "TODO-deploy-streamlit-and-paste-url"   # e.g. HuggingFace Spaces / Streamlit Cloud running app.py
+sandbox_link: "https://huggingface.co/spaces/xPushkal/RUNAI"   # Streamlit Space running app.py
 
 reproduce_command: "python rank.py --candidates ./India_runs_data_and_ai_challenge/candidates.jsonl --out ./submission.csv"
 # Pre-computation (embeddings + graph features) is a documented one-time step:
