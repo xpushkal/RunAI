@@ -10,7 +10,8 @@ top-K shared with the full ranker.
 |---------|------:|------:|-------:|----------:|---------:|
 | **FULL (reference)** | 1.00 | 1.00 | 1.00 | 0 | 0 |
 | structured-only (no embeddings) | 1.00 | 0.96 | 0.92 | 0 | 0 |
-| embeddings-only relevance (no structured proxy) | 0.90 | 0.76 | 0.79 | 0 | 0 |
+| embeddings-only relevance (no structured proxy) | 0.90 | 0.76 | 0.82 | 0 | 0 |
+| no role_gate | 1.00 | 1.00 | 1.00 | 0 | 0 |
 | no graph_boost | 0.50 | 0.52 | 0.71 | 0 | 0 |
 | no behavior_modifier | **0.00** | 0.54 | 0.56 | 0 | 0 |
 | no penalties | 1.00 | 0.98 | 0.97 | 0 | 0 |
@@ -21,6 +22,12 @@ top-K shared with the full ranker.
   (1.00) and most of the top-50 (0.96) — the structured signal carries the *head*. Embeddings-only
   relevance keeps the top-10 mostly (0.90) but diverges in the tail (0.76–0.79) — embeddings add
   *recall* (plain-language fits) at ranks 50–100. Blending both is the point.
+- **role_gate is a safety net, not load-bearing on real data** (all 1.00): on the full 100k there
+  are enough genuine fits that off-role profiles never reach the top-100 on score alone, so the gate
+  changes nothing here. But it is decisive on **adversarial or small inputs** (e.g. the ≤100-candidate
+  sandbox sample): without it, an off-role profile with an AI-flavoured summary rides a high semantic
+  `embed_sim` into the visible top. The gate (`floor + (1-floor)·max(title_fit, career_fit)`) closes
+  that hole while still letting plain-language fits through on career evidence.
 - **graph_boost is a real head re-orderer** (top-10 overlap 0.50): among many similarly-relevant AI
   engineers, the kNN peer-quality + company-product signal meaningfully decides ordering.
 - **behavior_modifier is the decisive differentiator at the very top** (top-10 overlap 0.00).

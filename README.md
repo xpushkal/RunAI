@@ -21,7 +21,7 @@ OFFLINE precompute (one-time, ~15 min CPU, may exceed budget — allowed by spec
 
 ONLINE ranking step (~12s, CPU only, NO network — the reproduce command)
   rank.py ─▶ load cached vectors + graph (pure numpy)
-          ─▶ score = relevance × experience × location × graph_boost
+          ─▶ score = relevance × role_gate × experience × location × graph_boost
                      × behaviour × penalties × (0 if honeypot)
           ─▶ top 100 ─▶ fact-grounded reasoning ─▶ submission.csv
 ```
@@ -29,6 +29,9 @@ ONLINE ranking step (~12s, CPU only, NO network — the reproduce command)
 **Scoring** (all components interpretable, see [`config.yaml`](config.yaml)):
 - `relevance = 0.55·semantic-similarity-to-JD + 0.45·structured-proxy`
   (structured-proxy = title-fit + career-evidence + corroborated-skill-trust)
+- `× role_gate ∈ [0.15,1]` = `floor + (1-floor)·max(title_fit, career_fit)` — a hard
+  gate so an off-role profile can't ride a high semantic score; plain-language fits
+  pass via their career evidence (skill_trust is deliberately *not* a hard gate)
 - `× experience_fit` (soft 5–9y band) `× location_fit` (Noida/Pune/India or relocatable)
 - `× graph_boost ∈ [0.85,1.15]` — kNN peer-quality + skill co-occurrence + company product-ness
 - `× behaviour_modifier` — last-active recency, recruiter response, open-to-work, notice period

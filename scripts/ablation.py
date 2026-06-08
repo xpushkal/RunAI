@@ -50,7 +50,7 @@ def load_features(cfg):
 
 
 def raw_score(feat, cfg, *, use_embed=True, use_graph=True, use_behavior=True,
-              use_penalty=True, use_honeypot=True, embed_only=False):
+              use_penalty=True, use_honeypot=True, use_role_gate=True, embed_only=False):
     proxy = structured_proxy(feat, cfg)
     es = feat.get("embed_sim")
     if embed_only and es is not None:
@@ -61,7 +61,12 @@ def raw_score(feat, cfg, *, use_embed=True, use_graph=True, use_behavior=True,
     else:
         rel = proxy
     gb = feat.get("graph_boost", 1.0) if use_graph else 1.0
-    base = rel * feat["experience_fit"] * feat["location_fit"] * gb
+    if use_role_gate:
+        floor = cfg["scoring"]["role_gate"]["floor"]
+        rg = floor + (1.0 - floor) * max(feat["title_fit"], feat["career_fit"])
+    else:
+        rg = 1.0
+    base = rel * rg * feat["experience_fit"] * feat["location_fit"] * gb
     s = base * (feat["penalty"] if use_penalty else 1.0) * (feat["behavior_mod"] if use_behavior else 1.0)
     if use_honeypot and feat["honeypot_score"] >= cfg["honeypot"]["score_threshold"]:
         s = 0.0
@@ -97,6 +102,7 @@ def main():
         "FULL (reference)": {},
         "structured-only": {"use_embed": False},
         "embeddings-only-rel": {"embed_only": True},
+        "no role_gate": {"use_role_gate": False},
         "no graph_boost": {"use_graph": False},
         "no behavior_mod": {"use_behavior": False},
         "no penalties": {"use_penalty": False},

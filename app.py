@@ -14,6 +14,7 @@ import json
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 from src import jd
 from src.config import load_config
@@ -122,7 +123,7 @@ def main():
     st.caption("Purple = candidate (hover for reasoning); green = a JD-relevant skill they hold.")
     try:
         html = _build_graph_html(top, records_by_id, k=min(top_n, 12))
-        st.components.v1.html(html, height=580)
+        components.html(html, height=580)
     except Exception as e:  # pragma: no cover - viz is best-effort
         st.warning(f"Graph view unavailable: {e}")
 

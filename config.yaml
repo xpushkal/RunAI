@@ -31,8 +31,9 @@ graph:
 
 # ----------------------------------------------------------------------------
 # Scoring weights. final = base * penalties * behavior_mod * (0 if honeypot)
-# base = relevance^w_rel * role_gate * skill_trust * experience_fit * location_fit * graph_boost
-# Multiplicative gates are in [0,1]; relevance is exponentiated by w_rel.
+# base = relevance * role_gate * experience_fit * location_fit * graph_boost
+# role_gate = floor + (1-floor)*max(title_fit, career_fit) — gates off-role profiles.
+# skill_trust is a soft term inside relevance, NOT a hard gate (would bury plain-language fits).
 # ----------------------------------------------------------------------------
 scoring:
   w_relevance: 1.0

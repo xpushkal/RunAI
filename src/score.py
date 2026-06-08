@@ -9,8 +9,17 @@ is blended into `relevance` (see `relevance_from_features`).
 
 Final score:
     relevance = 0.45*title_fit + 0.40*career_fit + 0.15*skill_trust   (M2 proxy)
-    base      = relevance * experience_fit * location_fit * graph_boost
+    role_gate = floor + (1-floor) * max(title_fit, career_fit)
+    base      = relevance * role_gate * experience_fit * location_fit * graph_boost
     final     = base * penalty * behavior_mod * (0 if honeypot else 1)
+
+`role_gate` is a hard multiplier that keeps off-role keyword-stuffers (high
+semantic embed_sim from an AI-flavoured summary, but no title/career evidence of
+relevant work) from floating up on the additive embedding term alone. It uses
+`max(title_fit, career_fit)` so genuine plain-language "Tier-5" fits — modest
+title but career history that shows they *built* relevant systems — pass the gate.
+skill_trust is deliberately NOT a hard gate: real plain-language fits often list
+no AI skills, so gating on it would bury them (it stays a soft term in relevance).
 Ranking: sort by final desc, tie-break candidate_id asc, take top N, assign ranks.
 Emitted score is rescaled into [score_min, score_max] so it stays differentiated
 and non-increasing by rank (satisfies the validator).
@@ -42,9 +51,19 @@ def relevance(feat: dict, cfg: dict) -> float:
     return blend["embed"] * embed_sim + blend["structured"] * proxy
 
 
+def role_gate(feat: dict, cfg: dict) -> float:
+    """Hard role-fit multiplier in [floor, 1]. Off-role profiles (no title or
+    career evidence of relevant work) are gated down so a high semantic embed_sim
+    alone can't surface them; plain-language fits pass via their career evidence.
+    """
+    floor = cfg["scoring"]["role_gate"]["floor"]
+    role_quality = max(feat["title_fit"], feat["career_fit"])
+    return floor + (1.0 - floor) * role_quality
+
+
 def final_score(feat: dict, cfg: dict, graph_boost: float = 1.0) -> float:
     rel = relevance(feat, cfg)
-    base = rel * feat["experience_fit"] * feat["location_fit"] * graph_boost
+    base = rel * role_gate(feat, cfg) * feat["experience_fit"] * feat["location_fit"] * graph_boost
     score = base * feat["penalty"] * feat["behavior_mod"]
 
     if cfg["honeypot"]["hard_demote"] and feat["honeypot_score"] >= cfg["honeypot"]["score_threshold"]:
